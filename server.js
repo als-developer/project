@@ -1,4 +1,4 @@
-// server.js - Complete single-file solution for Heroku
+// server.js - Complete working version with Firebase
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -7,7 +7,7 @@ const session = require('express-session');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// Firebase imports (using require for CommonJS compatibility)
+// Firebase imports
 const { initializeApp } = require('firebase/app');
 const { 
   getDatabase, 
@@ -46,6 +46,12 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID || '1:576478647938:web:4caa4414d0687abe46869b'
 };
 
+console.log('📋 Firebase Config:', {
+  projectId: firebaseConfig.projectId,
+  databaseURL: firebaseConfig.databaseURL,
+  apiKey: firebaseConfig.apiKey ? '✅ Set' : '❌ Missing'
+});
+
 // Initialize Firebase
 let firebaseApp, database, storage;
 
@@ -56,20 +62,19 @@ try {
   console.log('✅ Firebase initialized successfully');
 } catch (error) {
   console.error('❌ Firebase initialization error:', error.message);
+  process.exit(1);
 }
 
 // ==================== MIDDLEWARE ====================
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? 'https://project-test-bdeffc30af24.herokuapp.com' 
-    : 'http://localhost:3000',
+  origin: true,
   credentials: true
 }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files
+// Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Session configuration
@@ -87,13 +92,14 @@ app.use(session({
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024 // 10MB
   },
   fileFilter: (req, file, cb) => {
-    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/avi'];
-    
-    if (allowedImageTypes.includes(file.mimetype) || allowedVideoTypes.includes(file.mimetype)) {
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Only images and videos are allowed.'));
@@ -101,13 +107,33 @@ const upload = multer({
   }
 });
 
-// ==================== FIREBASE SERVICE CLASS ====================
+// ==================== FIREBASE SERVICE ====================
 class FirebaseService {
+  // Test Firebase connection
+  static async testConnection() {
+    try {
+      const testRef = ref(database, 'test');
+      await set(testRef, { 
+        timestamp: new Date().toISOString(),
+        message: 'Connection test successful'
+      });
+      console.log('✅ Firebase connection test successful');
+      return true;
+    } catch (error) {
+      console.error('❌ Firebase connection test failed:', error.message);
+      return false;
+    }
+  }
+
+  // Create new user
   static async createUser(username, password, email = '') {
     try {
+      console.log(`📝 Creating user: ${username}`);
+      
       const usersRef = ref(database, 'users');
       const hashedPassword = await bcrypt.hash(password, 10);
       
+      // Check if username exists
       const userQuery = query(usersRef, orderByChild('username'), equalTo(username));
       const snapshot = await get(userQuery);
       
@@ -118,7 +144,7 @@ class FirebaseService {
       const newUserRef = push(usersRef);
       const userId = newUserRef.key;
       
-      await set(newUserRef, {
+      const userData = {
         id: userId,
         username: username,
         email: email || '',
@@ -127,19 +153,24 @@ class FirebaseService {
         totalFiles: 0,
         storageUsed: 0,
         lastLogin: null
-      });
-
+      };
+      
+      await set(newUserRef, userData);
+      
+      console.log(`✅ User created: ${username} (${userId})`);
+      
       return { 
         success: true, 
         userId: userId,
         message: 'User created successfully'
       };
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error('❌ Error creating user:', error.message);
       return { success: false, error: error.message };
     }
   }
 
+  // Login user
   static async loginUser(username, password) {
     try {
       const usersRef = ref(database, 'users');
@@ -181,13 +212,16 @@ class FirebaseService {
         }
       };
     } catch (error) {
-      console.error('Error logging in:', error);
+      console.error('❌ Error logging in:', error.message);
       return { success: false, error: error.message };
     }
   }
 
+  // Upload file
   static async uploadFile(userId, file, fileType) {
     try {
+      console.log(`📤 Uploading file: ${file.originalname} for user ${userId}`);
+      
       const timestamp = Date.now();
       const uniqueId = Math.random().toString(36).substring(7);
       const fileName = `${userId}/${fileType}s/${timestamp}_${uniqueId}_${file.originalname}`;
@@ -206,6 +240,7 @@ class FirebaseService {
       await uploadBytes(storageRefPath, file.buffer, metadata);
       const downloadURL = await getDownloadURL(storageRefPath);
 
+      // Save to database
       const userFilesRef = ref(database, `users/${userId}/files`);
       const newFileRef = push(userFilesRef);
       const fileId = newFileRef.key;
@@ -223,6 +258,7 @@ class FirebaseService {
 
       await set(newFileRef, fileData);
 
+      // Update user stats
       const userRef = ref(database, `users/${userId}`);
       const userSnapshot = await get(userRef);
       const userData = userSnapshot.val();
@@ -232,6 +268,8 @@ class FirebaseService {
         storageUsed: (userData.storageUsed || 0) + file.size
       });
 
+      console.log(`✅ File uploaded: ${file.originalname}`);
+      
       return {
         success: true,
         fileId: fileId,
@@ -239,11 +277,12 @@ class FirebaseService {
         fileData: fileData
       };
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error('❌ Error uploading file:', error.message);
       return { success: false, error: error.message };
     }
   }
 
+  // Get user files
   static async getUserFiles(userId) {
     try {
       const userFilesRef = ref(database, `users/${userId}/files`);
@@ -264,11 +303,12 @@ class FirebaseService {
       files.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
       return { success: true, files };
     } catch (error) {
-      console.error('Error getting user files:', error);
+      console.error('❌ Error getting files:', error.message);
       return { success: false, error: error.message };
     }
   }
 
+  // Get files by type
   static async getFilesByType(userId, fileType) {
     try {
       const userFilesRef = ref(database, `users/${userId}/files`);
@@ -292,13 +332,16 @@ class FirebaseService {
       files.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
       return { success: true, files };
     } catch (error) {
-      console.error('Error getting files by type:', error);
+      console.error('❌ Error getting files by type:', error.message);
       return { success: false, error: error.message };
     }
   }
 
+  // Delete file
   static async deleteFile(userId, fileId) {
     try {
+      console.log(`🗑️ Deleting file: ${fileId}`);
+      
       const fileRef = ref(database, `users/${userId}/files/${fileId}`);
       const fileSnapshot = await get(fileRef);
       
@@ -308,13 +351,16 @@ class FirebaseService {
 
       const fileData = fileSnapshot.val();
 
+      // Delete from Storage
       if (fileData.storagePath) {
         const storageRefPath = storageRef(storage, fileData.storagePath);
         await deleteObject(storageRefPath);
       }
 
+      // Delete from Database
       await remove(fileRef);
 
+      // Update user stats
       const userRef = ref(database, `users/${userId}`);
       const userSnapshot = await get(userRef);
       const userData = userSnapshot.val();
@@ -324,13 +370,16 @@ class FirebaseService {
         storageUsed: Math.max(0, (userData.storageUsed || 0) - (fileData.size || 0))
       });
 
+      console.log(`✅ File deleted: ${fileId}`);
+      
       return { success: true, message: 'File deleted successfully' };
     } catch (error) {
-      console.error('Error deleting file:', error);
+      console.error('❌ Error deleting file:', error.message);
       return { success: false, error: error.message };
     }
   }
 
+  // Get user stats
   static async getUserStats(userId) {
     try {
       const userRef = ref(database, `users/${userId}`);
@@ -351,54 +400,33 @@ class FirebaseService {
         }
       };
     } catch (error) {
-      console.error('Error getting user stats:', error);
+      console.error('❌ Error getting stats:', error.message);
       return { success: false, error: error.message };
     }
   }
 
-  static async getAllUsers() {
-    try {
-      const usersRef = ref(database, 'users');
-      const snapshot = await get(usersRef);
-      
-      if (!snapshot.exists()) {
-        return { success: true, users: [] };
-      }
-
-      const users = [];
-      snapshot.forEach((childSnapshot) => {
-        const userData = childSnapshot.val();
-        delete userData.password;
-        users.push({
-          id: childSnapshot.key,
-          ...userData
-        });
-      });
-
-      return { success: true, users };
-    } catch (error) {
-      console.error('Error getting users:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
+  // Initialize demo user
   static async initDemoUser() {
     try {
-      const adminUsername = 'demo';
-      const adminPassword = 'demo123';
+      const username = 'demo';
+      const password = 'demo123';
       
       const usersRef = ref(database, 'users');
-      const userQuery = query(usersRef, orderByChild('username'), equalTo(adminUsername));
+      const userQuery = query(usersRef, orderByChild('username'), equalTo(username));
       const snapshot = await get(userQuery);
       
       if (!snapshot.exists()) {
-        await this.createUser(adminUsername, adminPassword, 'demo@example.com');
-        console.log('✅ Demo user created: demo / demo123');
+        const result = await this.createUser(username, password, 'demo@example.com');
+        if (result.success) {
+          console.log('✅ Demo user created: demo / demo123');
+        } else {
+          console.log('⚠️ Failed to create demo user:', result.error);
+        }
       } else {
         console.log('✅ Demo user already exists');
       }
     } catch (error) {
-      console.error('Error creating demo user:', error);
+      console.error('❌ Error creating demo user:', error.message);
     }
   }
 }
@@ -406,11 +434,12 @@ class FirebaseService {
 // ==================== API ROUTES ====================
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  const dbStatus = await FirebaseService.testConnection();
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
+    firebase: dbStatus ? 'Connected' : 'Disconnected',
     environment: process.env.NODE_ENV || 'development'
   });
 });
@@ -458,7 +487,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -479,15 +508,14 @@ app.post('/api/auth/login', async (req, res) => {
       
       res.json({
         success: true,
-        user: result.user,
-        sessionId: req.session.id
+        user: result.user
       });
     } else {
       res.status(401).json(result);
     }
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -538,7 +566,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     }
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: error.message || 'Upload failed' });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -634,27 +662,7 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// Admin - get all users
-app.get('/api/admin/users', async (req, res) => {
-  try {
-    if (!req.session.userId) {
-      return res.status(401).json({ error: 'Please login first' });
-    }
-
-    const result = await FirebaseService.getAllUsers();
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json({ error: result.error });
-    }
-  } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Serve HTML
+// Serve index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -670,17 +678,28 @@ app.use((err, req, res, next) => {
 // ==================== START SERVER ====================
 async function startServer() {
   try {
-    // Initialize demo user
-    await FirebaseService.initDemoUser();
+    console.log('🔍 Testing Firebase connection...');
+    const connected = await FirebaseService.testConnection();
     
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📱 Open: http://localhost:${PORT}`);
-      console.log(`🔑 Demo: demo / demo123`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
+    if (connected) {
+      await FirebaseService.initDemoUser();
+      
+      app.listen(PORT, () => {
+        console.log(`\n🚀 Server running on port ${PORT}`);
+        console.log(`📱 Open: http://localhost:${PORT}`);
+        console.log(`🔑 Demo credentials: demo / demo123`);
+        console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`\n✅ All systems ready!`);
+      });
+    } else {
+      console.error('\n❌ Firebase connection failed. Please check:');
+      console.error('1. Firebase security rules are set to: { "rules": { ".read": true, ".write": true } }');
+      console.error('2. Firebase configuration in .env is correct');
+      console.error('3. Network connectivity');
+      process.exit(1);
+    }
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('❌ Failed to start server:', error.message);
     process.exit(1);
   }
 }

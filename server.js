@@ -1,16 +1,13 @@
-// server.js - Main Express Server
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import multer from 'multer';
-import session from 'express-session';
-import { FirebaseService } from './firebase.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// server.js - Main Express Server (CommonJS version for Heroku compatibility)
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const multer = require('multer');
+const session = require('express-session');
+const path = require('path');
+const { FirebaseService } = require('./firebase.cjs');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+// Load environment variables
 dotenv.config();
 
 const app = express();
@@ -18,28 +15,32 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://project-test-bdeffc30af24.herokuapp.com' 
+    : 'http://localhost:3000',
   credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('.'));
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Session configuration
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
 
 // Configure multer for file uploads (memory storage)
-const storage = multer.memoryStorage();
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
   },
@@ -55,14 +56,36 @@ const upload = multer({
   }
 });
 
-// Initialize demo user
-await FirebaseService.initDemoUser();
+// Initialize demo user (async IIFE)
+(async function initDemoUser() {
+  try {
+    await FirebaseService.initDemoUser();
+    console.log('✅ Firebase initialized successfully');
+  } catch (error) {
+    console.error('❌ Firebase initialization error:', error.message);
+  }
+})();
 
 // ==================== API ROUTES ====================
 
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    memory: process.memoryUsage()
+  });
+});
+
 // Test route
 app.get('/api/test', (req, res) => {
-  res.json({ message: 'Server is running!', timestamp: new Date().toISOString() });
+  res.json({ 
+    message: 'Server is running!', 
+    timestamp: new Date().toISOString(),
+    session: req.session.id
+  });
 });
 
 // Check session status
@@ -80,47 +103,57 @@ app.get('/api/session', (req, res) => {
 
 // Register user
 app.post('/api/auth/register', async (req, res) => {
-  const { username, password, email } = req.body;
-  
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
+  try {
+    const { username, password, email } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
-  }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
 
-  const result = await FirebaseService.createUser(username, password, email);
-  
-  if (result.success) {
-    res.json(result);
-  } else {
-    res.status(400).json(result);
+    const result = await FirebaseService.createUser(username, password, email);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(400).json(result);
+    }
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Login user
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
 
-  const result = await FirebaseService.loginUser(username, password);
-  
-  if (result.success) {
-    // Set session
-    req.session.userId = result.userId;
-    req.session.username = result.user.username;
+    const result = await FirebaseService.loginUser(username, password);
     
-    res.json({
-      success: true,
-      user: result.user,
-      sessionId: req.session.id
-    });
-  } else {
-    res.status(401).json(result);
+    if (result.success) {
+      // Set session
+      req.session.userId = result.userId;
+      req.session.username = result.user.username;
+      
+      res.json({
+        success: true,
+        user: result.user,
+        sessionId: req.session.id
+      });
+    } else {
+      res.status(401).json(result);
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -174,7 +207,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     }
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || 'Upload failed' });
   }
 });
 
@@ -273,12 +306,10 @@ app.get('/api/stats', async (req, res) => {
 // Admin route - get all users
 app.get('/api/admin/users', async (req, res) => {
   try {
-    // Check if user is admin (simple check - you can implement proper admin logic)
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Please login first' });
     }
 
-    // For demo, let any logged in user see users
     const result = await FirebaseService.getAllUsers();
     
     if (result.success) {
@@ -292,30 +323,26 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage()
-  });
-});
-
-// Serve the main HTML file
+// Serve main HTML file
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(500).json({ error: err.message || 'Internal server error' });
+  res.status(500).json({ 
+    error: err.message || 'Internal server error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Open browser and navigate to http://localhost:${PORT}`);
-  console.log('🔑 Demo credentials: demo / demo123');
+  console.log(`🔑 Demo credentials: demo / demo123`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
+
+module.exports = app;

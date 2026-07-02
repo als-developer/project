@@ -34,11 +34,6 @@
             text-align: center;
             color: #333;
             margin-bottom: 30px;
-            font-size: 2em;
-        }
-        
-        .auth-section {
-            margin-bottom: 30px;
         }
         
         .auth-form {
@@ -46,6 +41,7 @@
             gap: 10px;
             flex-wrap: wrap;
             justify-content: center;
+            margin: 10px 0;
         }
         
         .auth-form input {
@@ -70,8 +66,6 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
         
         .btn-primary {
@@ -91,7 +85,6 @@
         
         .btn-danger:hover {
             background: #c0392b;
-            transform: translateY(-2px);
         }
         
         .btn-success {
@@ -101,7 +94,6 @@
         
         .btn-success:hover {
             background: #27ae60;
-            transform: translateY(-2px);
         }
         
         .btn-secondary {
@@ -111,18 +103,16 @@
         
         .btn-secondary:hover {
             background: #7f8c8d;
-            transform: translateY(-2px);
         }
         
         .user-info {
-            display: flex;
+            display: none;
             justify-content: space-between;
             align-items: center;
             background: #f8f9fa;
             padding: 15px;
             border-radius: 10px;
             margin-bottom: 20px;
-            display: none;
         }
         
         .user-info.active {
@@ -155,25 +145,6 @@
             transform: scale(1.02);
         }
         
-        .upload-label i {
-            margin-right: 10px;
-        }
-        
-        .file-input-container {
-            margin: 15px 0;
-        }
-        
-        .upload-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 15px;
-        }
-        
-        .files-section {
-            margin-top: 30px;
-        }
-        
         .files-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -186,13 +157,7 @@
             border-radius: 10px;
             padding: 15px;
             text-align: center;
-            transition: all 0.3s;
             border: 1px solid #e0e0e0;
-        }
-        
-        .file-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
         
         .file-card img,
@@ -215,17 +180,6 @@
             font-size: 12px;
             color: #666;
             margin-bottom: 10px;
-        }
-        
-        .file-card .file-actions {
-            display: flex;
-            gap: 5px;
-            justify-content: center;
-        }
-        
-        .file-card .file-actions .btn {
-            padding: 5px 10px;
-            font-size: 11px;
         }
         
         .status {
@@ -256,34 +210,6 @@
             border: 1px solid #bee5eb;
         }
         
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .filter-buttons {
-            display: flex;
-            gap: 10px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-        
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -310,6 +236,13 @@
             margin-top: 5px;
         }
         
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
         .auth-toggle {
             text-align: center;
             margin-top: 10px;
@@ -319,6 +252,16 @@
             color: #667eea;
             cursor: pointer;
             text-decoration: underline;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
         }
         
         @media (max-width: 600px) {
@@ -350,10 +293,8 @@
     <div class="container">
         <h1>📁 File Upload System</h1>
         
-        <!-- Status Messages -->
         <div id="status" class="status"></div>
         
-        <!-- User Info -->
         <div id="userInfo" class="user-info">
             <div>
                 <strong>👤 <span id="usernameDisplay"></span></strong>
@@ -362,8 +303,7 @@
             <button onclick="logout()" class="btn btn-danger">Logout</button>
         </div>
         
-        <!-- Auth Section -->
-        <div id="authSection" class="auth-section">
+        <div id="authSection">
             <div id="loginForm" class="auth-form">
                 <input type="text" id="loginUsername" placeholder="Username" required>
                 <input type="password" id="loginPassword" placeholder="Password" required>
@@ -372,7 +312,7 @@
             <div class="auth-toggle">
                 <a onclick="toggleAuth()">Don't have an account? Register</a>
             </div>
-            <div id="registerForm" class="auth-form" style="display: none; margin-top: 10px;">
+            <div id="registerForm" class="auth-form hidden" style="margin-top: 10px;">
                 <input type="text" id="registerUsername" placeholder="Username" required>
                 <input type="email" id="registerEmail" placeholder="Email (optional)">
                 <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" required>
@@ -383,24 +323,18 @@
             </div>
         </div>
         
-        <!-- Upload Section -->
-        <div id="uploadSection" style="display: none;">
+        <div id="uploadSection" class="hidden">
             <div class="upload-section">
                 <h3>Upload Files</h3>
-                <div class="file-input-container">
+                <div style="margin: 15px 0;">
                     <input type="file" id="fileInput" accept="image/*,video/*" multiple>
-                    <label for="fileInput" class="upload-label">
-                        📎 Choose Images & Videos
-                    </label>
+                    <label for="fileInput" class="upload-label">📎 Choose Images & Videos</label>
                 </div>
                 <div id="selectedFiles"></div>
-                <div class="upload-actions">
-                    <button onclick="uploadFiles()" class="btn btn-primary">Upload Files</button>
-                </div>
+                <button onclick="uploadFiles()" class="btn btn-primary">Upload Files</button>
             </div>
             
-            <!-- Stats -->
-            <div id="statsSection" class="stats">
+            <div class="stats">
                 <div class="stat-card">
                     <div class="stat-number" id="totalFiles">0</div>
                     <div class="stat-label">Total Files</div>
@@ -419,15 +353,13 @@
                 </div>
             </div>
             
-            <!-- Filter Buttons -->
             <div class="filter-buttons">
                 <button onclick="loadFiles('all')" class="btn btn-secondary">All Files</button>
                 <button onclick="loadFiles('image')" class="btn btn-primary">📷 Images</button>
                 <button onclick="loadFiles('video')" class="btn btn-success">🎬 Videos</button>
             </div>
             
-            <!-- Files Section -->
-            <div id="filesSection" class="files-section">
+            <div id="filesSection">
                 <h3>Your Files</h3>
                 <div id="filesContainer">
                     <div class="loading">Loading files...</div>
@@ -440,7 +372,6 @@
         let currentUser = null;
         let currentFilter = 'all';
 
-        // Show status message
         function showStatus(message, type = 'info') {
             const status = document.getElementById('status');
             status.textContent = message;
@@ -450,26 +381,24 @@
             }, 5000);
         }
 
-        // Toggle login/register
         function toggleAuth() {
             const loginForm = document.getElementById('loginForm');
             const registerForm = document.getElementById('registerForm');
             const toggleLinks = document.querySelectorAll('.auth-toggle a');
             
-            if (loginForm.style.display === 'none') {
-                loginForm.style.display = 'flex';
-                registerForm.style.display = 'none';
+            if (loginForm.classList.contains('hidden')) {
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
                 toggleLinks[0].textContent = "Don't have an account? Register";
                 toggleLinks[1].textContent = "Already have an account? Login";
             } else {
-                loginForm.style.display = 'none';
-                registerForm.style.display = 'flex';
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
                 toggleLinks[0].textContent = "Already have an account? Login";
                 toggleLinks[1].textContent = "Don't have an account? Register";
             }
         }
 
-        // Register user
         async function register() {
             const username = document.getElementById('registerUsername').value.trim();
             const email = document.getElementById('registerEmail').value.trim();
@@ -499,7 +428,7 @@
                     document.getElementById('registerUsername').value = '';
                     document.getElementById('registerEmail').value = '';
                     document.getElementById('registerPassword').value = '';
-                    toggleAuth(); // Switch to login form
+                    toggleAuth();
                 } else {
                     showStatus(data.error || 'Registration failed', 'error');
                 }
@@ -508,7 +437,6 @@
             }
         }
 
-        // Login user
         async function login() {
             const username = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value;
@@ -531,8 +459,8 @@
                     currentUser = data.user;
                     document.getElementById('usernameDisplay').textContent = currentUser.username;
                     document.getElementById('userInfo').classList.add('active');
-                    document.getElementById('authSection').style.display = 'none';
-                    document.getElementById('uploadSection').style.display = 'block';
+                    document.getElementById('authSection').classList.add('hidden');
+                    document.getElementById('uploadSection').classList.remove('hidden');
                     
                     showStatus('Welcome back, ' + currentUser.username + '!', 'success');
                     await loadStats();
@@ -545,14 +473,13 @@
             }
         }
 
-        // Logout user
         async function logout() {
             try {
                 await fetch('/api/auth/logout', { method: 'POST' });
                 currentUser = null;
                 document.getElementById('userInfo').classList.remove('active');
-                document.getElementById('authSection').style.display = 'block';
-                document.getElementById('uploadSection').style.display = 'none';
+                document.getElementById('authSection').classList.remove('hidden');
+                document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('loginUsername').value = '';
                 document.getElementById('loginPassword').value = '';
                 showStatus('Logged out successfully', 'info');
@@ -561,7 +488,6 @@
             }
         }
 
-        // Upload files
         async function uploadFiles() {
             const fileInput = document.getElementById('fileInput');
             const files = fileInput.files;
@@ -576,21 +502,16 @@
                 return;
             }
 
-            const formData = new FormData();
-            for (let file of files) {
-                formData.append('file', file);
-            }
-
             try {
                 showStatus('Uploading files...', 'info');
                 
                 for (let file of files) {
-                    const singleFormData = new FormData();
-                    singleFormData.append('file', file);
+                    const formData = new FormData();
+                    formData.append('file', file);
                     
                     const response = await fetch('/api/upload', {
                         method: 'POST',
-                        body: singleFormData
+                        body: formData
                     });
 
                     const data = await response.json();
@@ -610,10 +531,10 @@
             }
         }
 
-        // Load user files
         async function loadFiles(filter = 'all') {
             currentFilter = filter;
             const container = document.getElementById('filesContainer');
+            container.innerHTML = '<div class="loading">Loading files...</div>';
             
             try {
                 let url = '/api/files';
@@ -625,7 +546,7 @@
                 const data = await response.json();
 
                 if (!data.success) {
-                    container.innerHTML = `<div class="loading">Error loading files: ${data.error}</div>`;
+                    container.innerHTML = `<div class="loading">Error: ${data.error}</div>`;
                     return;
                 }
 
@@ -655,9 +576,9 @@
                             ${preview}
                             <div class="file-name">${typeLabel} ${file.name}</div>
                             <div class="file-size">${sizeMB} MB</div>
-                            <div class="file-actions">
-                                <a href="${file.downloadURL}" target="_blank" class="btn btn-primary" style="padding:5px 10px; font-size:11px;">View</a>
-                                <button onclick="deleteFile('${file.id}')" class="btn btn-danger" style="padding:5px 10px; font-size:11px;">Delete</button>
+                            <div>
+                                <a href="${file.downloadURL}" target="_blank" class="btn btn-primary" style="padding:5px 10px; font-size:11px; margin:2px;">View</a>
+                                <button onclick="deleteFile('${file.id}')" class="btn btn-danger" style="padding:5px 10px; font-size:11px; margin:2px;">Delete</button>
                             </div>
                         </div>
                     `;
@@ -669,7 +590,6 @@
             }
         }
 
-        // Delete file
         async function deleteFile(fileId) {
             if (!confirm('Are you sure you want to delete this file?')) return;
 
@@ -692,7 +612,6 @@
             }
         }
 
-        // Load user statistics
         async function loadStats() {
             try {
                 const response = await fetch('/api/stats');
@@ -705,7 +624,6 @@
                     const storageMB = ((stats.storageUsed || 0) / (1024 * 1024)).toFixed(2);
                     document.getElementById('storageUsed').textContent = storageMB + ' MB';
 
-                    // Load file counts by type
                     const imageResponse = await fetch('/api/files/image');
                     const imageData = await imageResponse.json();
                     document.getElementById('imageCount').textContent = imageData.success ? imageData.files.length : 0;
@@ -719,7 +637,6 @@
             }
         }
 
-        // File input change handler
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const files = e.target.files;
             const selectedDiv = document.getElementById('selectedFiles');
@@ -739,20 +656,17 @@
             selectedDiv.innerHTML = html;
         });
 
-        // Auto-login check on page load
         async function checkSession() {
             try {
                 const response = await fetch('/api/session');
                 const data = await response.json();
                 
                 if (data.authenticated) {
-                    // User is already logged in
                     document.getElementById('usernameDisplay').textContent = data.username;
                     document.getElementById('userInfo').classList.add('active');
-                    document.getElementById('authSection').style.display = 'none';
-                    document.getElementById('uploadSection').style.display = 'block';
+                    document.getElementById('authSection').classList.add('hidden');
+                    document.getElementById('uploadSection').classList.remove('hidden');
                     
-                    // Load user data
                     await loadStats();
                     await loadFiles('all');
                 }
@@ -761,11 +675,8 @@
             }
         }
 
-        // Initialize
         checkSession();
-
-        // Demo credentials hint
-        console.log('Demo credentials: demo / demo123');
+        console.log('🔑 Demo credentials: demo / demo123');
     </script>
 </body>
 </html>

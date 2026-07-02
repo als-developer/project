@@ -1,4 +1,4 @@
-// server.js - Complete working version with Firebase
+// server.js - Complete working version
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -133,7 +133,7 @@ class FirebaseService {
       const usersRef = ref(database, 'users');
       const hashedPassword = await bcrypt.hash(password, 10);
       
-      // Check if username exists
+      // Check if username exists - using query with index
       const userQuery = query(usersRef, orderByChild('username'), equalTo(username));
       const snapshot = await get(userQuery);
       
@@ -173,6 +173,8 @@ class FirebaseService {
   // Login user
   static async loginUser(username, password) {
     try {
+      console.log(`🔑 Login attempt: ${username}`);
+      
       const usersRef = ref(database, 'users');
       const userQuery = query(usersRef, orderByChild('username'), equalTo(username));
       const snapshot = await get(userQuery);
@@ -199,6 +201,8 @@ class FirebaseService {
         lastLogin: new Date().toISOString()
       });
 
+      console.log(`✅ User logged in: ${username}`);
+      
       return { 
         success: true, 
         userId: userId,
@@ -682,7 +686,12 @@ async function startServer() {
     const connected = await FirebaseService.testConnection();
     
     if (connected) {
-      await FirebaseService.initDemoUser();
+      // Try to create demo user, but don't fail if it doesn't work
+      try {
+        await FirebaseService.initDemoUser();
+      } catch (demoError) {
+        console.log('⚠️ Demo user creation skipped:', demoError.message);
+      }
       
       app.listen(PORT, () => {
         console.log(`\n🚀 Server running on port ${PORT}`);
@@ -693,7 +702,7 @@ async function startServer() {
       });
     } else {
       console.error('\n❌ Firebase connection failed. Please check:');
-      console.error('1. Firebase security rules are set to: { "rules": { ".read": true, ".write": true } }');
+      console.error('1. Firebase security rules are set correctly');
       console.error('2. Firebase configuration in .env is correct');
       console.error('3. Network connectivity');
       process.exit(1);
